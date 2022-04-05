@@ -1,0 +1,1 @@
+new class{Controller(s,c){this.model=s,this.view=c}}(new class{constructor(){}},new class{constructor(){}});
