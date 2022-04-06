@@ -1,10 +1,16 @@
 class Model {
 	constructor() {
 		// Array of todo objects
-		this.todos = [
-			{id: 1, text: 'init node', complete: false},
-			{id: 2, text: 'init webpack', complete: false},
-		]
+		this.todos = JSON.parse(localStorage.getItem('todos')) || [];
+	}
+
+	bindTodoListChange(callback) {
+		this.onTodoListChange = callback;
+	}
+
+	_commit(todos) {
+		this.onTodoListChange(todos);
+		localStorage.setItem('todos', JSON.stringify(todos))
 	}
 
 	addTodo(todoText) {
@@ -14,18 +20,21 @@ class Model {
 			complete: false,
 		}
 		this.todos.push(todo);
+		this._commit(this.todos);
 	}
 
 	//Map todos array and replace text with ids
 	editTodo(id, updatedText) {
-		this.todos = this.todos.map((todo) =>
-		todo.id === id ? {id: todo.id, text: updatedText, complete: todo.complete}: todo, 
+		this.todos = this.todos.map(todo =>
+		todo.id === id ? {id: todo.id, text: updatedText, complete: todo.complete} : todo, 
 		);
+		this._commit(this.todos);
 	}
 
 	//Take a todo from array by id
 	deleteTodo(id) {
-		this.todos = this.todos.filter((todo) => todo.id !== id);
+		this.todos = this.todos.filter(todo => todo.id !== id);
+		this._commit(this.todos);
 	}
 
 	//Change boolean on the id
@@ -33,6 +42,7 @@ class Model {
 		this.todos  = this.todos.map((todo) =>
 			todo.id === id ? {id: todo.id, text: todo.text, completr: !todo.complete} : todo, 
 			);
+		this._commit(this.todos);
 	}
 }
 
@@ -40,10 +50,6 @@ class View {
 	constructor(){
 		//root element
 		this.app = this.getElement('#content');
-
-		//Title
-		this.title = this.createElement('h1');
-		this.title.textContent = 'Todos';
 
 		//Form and Buttons
 		this.form = this.createElement('form');
@@ -54,15 +60,33 @@ class View {
 		this.submitButton = this.createElement('button');
 		this.submitButton.textContent = 'Submit';
 
-		//Todo list
-		this.todoList = this.createElement('ul', 'todo-list');
-
 		//add buttons to form
 		this.form.append(this.input, this.submitButton);
 
+		//Title
+		this.title = this.createElement('h1');
+		this.title.textContent = 'To-dos';
+
+		//Todo list
+		this.todoList = this.createElement('ul', 'todo-list');
+
 		//add title, form, and list
 		this.app.append(this.title, this.form, this.todoList);
+
+		this._tempTodoText = '';
+		this._initLocalListeners();
 	}
+
+	//getter
+	get _todoText() {
+		return this.input.value;
+	}
+
+		//setter
+	_resetInput() {
+		this.input.value = '';
+	}
+
 	//create element with a css class
 	createElement(tag, className) {
 		const element = document.createElement(tag);
@@ -75,22 +99,12 @@ class View {
 		return element;
 	}
 
-	//getter
-	get _todoText() {
-		return this.input.value;
-	}
-
-	//setter
-	_resetInput() {
-		this.input.value = '';
-	}
-
 	//display list
 	displayTodos(todos) {
 		//delete nodes
 		while (this.todoList.firstChild) {
 			this.todoList.removeChild(this.todoList.firstChild);
-		};
+		}
 		if (todos.length === 0) {
 			const p = this.createElement('p');
 			p.textContent = 'Nothing on list. Add something?';
@@ -100,14 +114,14 @@ class View {
 			todos.forEach(todo => {
 				const li = this.createElement('li');
 				li.id = todo.id;
-				//checkbox for eaxh item
+				//checkbox for each item
 				const checkbox = this.createElement('input');
 				checkbox.type = 'checkbox';
 				checkbox.checked = todo.complete;
 				//todo item in a span
 				const span = this.createElement('span');
-				span.contentEdit = true;
-				span.classList.add('edit');
+				span.contentEditable = true;
+				span.classList.add('editable');
 				//Complete todo
 				if (todo.complete) {
 					const strike = this.createElement('s');
@@ -127,8 +141,18 @@ class View {
 				this.todoList.append(li);
 			});
 		}
-
+		console.log(todos);
 	}
+
+	//Update temp state
+	_initLocalListeners() {
+		this.todoList.addEventListener('input', event => {
+			if (event.target.className === 'editable') {
+				this._tempTodoText = event.target.innerText;
+			};
+		});
+	}
+
 	bindAddTodo(handler) {
 		this.form.addEventListener('submit', event => {
 			event.preventDefault();
@@ -146,6 +170,18 @@ class View {
 			};
 		});
 	}
+
+	//Send value to model
+	bindEditTodo(handler) {
+		this.todoList.addEventListener('focusout', event => {
+			if (this._tempTodoText) {
+				const id = parseInt(event.target.parentElement.id);
+				handler(id, this._tempTodoText);
+				this._tempTodoText = '';
+			};
+		});
+	}
+
 	bindToggleTodo(handler) {
 		this.todoList.addEventListener('change', event => {
 			if (event.target.type === 'checkbox') {
@@ -154,34 +190,42 @@ class View {
 			};
 		});
 	}
-
 }
 
 class Controller {
 	Controller(model, view) {
 		this.model = model;
 		this.view = view;
-		//display
-		this.onTodoListChange(this.model.todos);
+		
+		this.model.bindTodoListChange(this.onTodoListChange);
 		this.view.bindAddTodo(this.handleAddTodo);
+		this.view.bindEditTodo(this.handleEditTodo);
 		this.view.bindDeleteTodo(this.handleDeleteTodo);
 		this.view.bindToggleTodo(this.handleToggleTodo);
-		// this.view.bindEditTodo(this.handleEditTodo) - We'll do this one last
+
+		//display
+		this.onTodoListChange(this.model.todos);
+
 
 	}
-	onTodoListChange = (todos) => {
+
+	onTodoListChange = todos => {
 		this.view.displayTodos(todos);
 	}
-	handleAddTodo = (todoText) => {
+
+	handleAddTodo = todoText => {
 		this.model.addTodo(todoText);
 	}
+
 	handleEditTodo = (id, todoText) => {
 		this.model.editTodo(id, todoText); 
 	}
-	handleDeleteTodo = (id) => {
+
+	handleDeleteTodo = id => {
 		this.model.deleteTodo(id);
 	}
-	handleToggleTodo = (id) => {
+
+	handleToggleTodo = id => {
 		this.model.toggleTodo(id);
 	}
 }
