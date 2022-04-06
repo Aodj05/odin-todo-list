@@ -74,6 +74,61 @@ class View {
 		const element = document.querySelector(select);
 		return element;
 	}
+
+	//getter
+	get _todoText() {
+		return this.input.value;
+	}
+
+	//setter
+	_resetInput() {
+		this.input.value = '';
+	}
+
+	//display list
+	displayTodos(todos) {
+		//delete nodes
+		while (this.todoList.firstChild) {
+			this.todoList.removeChild(this.todoList.firstChild);
+		};
+		if (todos.length === 0) {
+			const p = this.createElement('p');
+			p.textContent = 'Nothing on list. Add something?';
+			this.todoList.append(p);
+		} else {
+			//todo item nodes
+			todos.forEach(todo => {
+				const li = this.createElement('li');
+				li.id = todo.id;
+				//checkbox for eaxh item
+				const checkbox = this.createElement('input');
+				checkbox.type = 'checkbox';
+				checkbox.checked = todo.complete;
+				//todo item in a span
+				const span = this.createElement('span');
+				span.contentEdit = true;
+				span.classList.add('edit');
+				//Complete todo
+				if (todo.complete) {
+					const strike = this.createElement('s');
+					strike.textContent = todo.text;
+					span.append(strike);
+				} else {
+					//Hust text
+					span.textContent = todo.text;
+				}
+
+				//delete todo
+				const deleteButton = this.createElement('button', 'delete');
+				deleteButton.textContent = 'Delete';
+				li.appened(checkbox, span, deleteButton);
+
+				// add node to todo list
+				
+			})
+		}
+
+	}
 }
 
 class Controller {
